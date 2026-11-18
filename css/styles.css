@@ -355,6 +355,9 @@ body.auth-mode .main{padding:0}
 .pw-eye:hover{color:var(--fg)}
 .pw-eye svg{width:19px;height:19px}
 .btn-block{width:100%}
+.login-links{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.link-btn{background:none;border:0;padding:.35rem 0;color:var(--leaf);font:inherit;font-size:.85rem;cursor:pointer;text-decoration:underline;min-height:44px}
+.link-btn:hover{color:var(--fg)}
 .demo-box{background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:.6rem .8rem;font-size:.82rem;display:flex;flex-direction:column;gap:.15rem}
 .kiosk-link{text-align:center;font-size:.85rem}
 .restricted{max-width:420px;margin:3rem auto;text-align:center;padding:2rem;display:flex;flex-direction:column;align-items:center;gap:.6rem}
@@ -364,6 +367,34 @@ body.auth-mode .main{padding:0}
   .login-card{gap:.55rem;padding:1rem}
   .login-brand{margin-bottom:0}
   .login-baybayin{font-size:1.1rem}
+}
+
+/* compact Create Owner Account: single column, sized to fit the screen without scrolling */
+.login-wrap:has(.login-card-wide){height:100vh;height:100svh;min-height:0;overflow:hidden;padding:.5rem}
+.login-card-wide{max-width:400px;gap:.4rem;padding:.9rem 1.3rem;max-height:100%}
+.login-card-wide .login-brand{margin-bottom:0}
+.login-card-wide .login-baybayin{font-size:1.05rem}
+.login-card-wide .auth-sub{text-align:center}
+.login-card-wide .field{gap:.15rem;font-size:.8rem}
+.login-card-wide .field input{padding-top:.4rem;padding-bottom:.4rem;min-height:38px}
+.login-card-wide .pw-eye{width:34px;height:34px}
+.login-card-wide .btn{min-height:40px}
+.login-card-wide .link-btn{min-height:28px;padding:0}
+.login-card-wide .field-err:empty{display:none}
+.su-grid{display:flex;flex-direction:column;gap:.4rem}
+.su-note{font-size:.74rem;margin:0;text-align:center}
+@media (max-height:720px){
+  .login-card-wide{gap:.3rem;padding:.7rem 1.1rem}
+  .login-card-wide .auth-sub,.login-card-wide .brand-sub{display:none}
+  .login-card-wide .field input{min-height:34px;padding-top:.3rem;padding-bottom:.3rem}
+  .login-card-wide .btn{min-height:36px}
+}
+@media (max-height:600px){
+  .login-card-wide .login-baybayin{display:none}
+  .login-card-wide .field{font-size:.74rem}
+  .login-card-wide .field input{min-height:30px;font-size:.9rem}
+  .login-card-wide .pw-eye{width:30px;height:30px}
+  .su-note{display:none}
 }
 
 /* offline banner */

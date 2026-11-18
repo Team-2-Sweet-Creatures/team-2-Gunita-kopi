@@ -746,6 +746,7 @@
       '<div class="card" style="max-width:640px">' +
       '<div class="form-row"><label class="field">Full name<input type="text" id="uf-name" value="' + esc(u.full_name) + '"></label>' +
       '<label class="field">Username<input type="text" id="uf-user" value="' + esc(u.username) + '"' + (isNew ? '' : ' disabled') + '></label></div>' +
+      '<div class="form-row"><label class="field">Email (used for password recovery)<input type="email" id="uf-email" value="' + esc(u.email || '') + '"></label></div>' +
       '<div class="form-row"><label class="field">' + (isNew ? 'Password (min 6 chars)' : 'New password (blank = keep)') +
       '<input type="text" id="uf-pass" value="" placeholder="' + (isNew ? 'required' : 'leave blank to keep') + '"></label>' +
       '<label class="field">Role<select id="uf-role"' + (isSelf ? ' disabled' : '') + '>' +
@@ -761,6 +762,8 @@
       var name = $('#uf-name').value.trim();
       var pw = $('#uf-pass').value;
       if (!name) { $('#uf-err').textContent = 'Full name is required.'; return; }
+      var email = $('#uf-email').value.trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('#uf-err').textContent = 'Enter a valid email address.'; return; }
       var role = isSelf ? u.role : $('#uf-role').value;
       var status = isSelf ? u.status : $('#uf-status').value;
       if (isNew) {
@@ -768,7 +771,7 @@
         if (!un) { $('#uf-err').textContent = 'Username is required.'; return; }
         if (S().users.some(function (x) { return x.username === un; })) { $('#uf-err').textContent = 'Username already taken.'; return; }
         if (pw.length < 6) { $('#uf-err').textContent = 'Password must be at least 6 characters.'; return; }
-        S().users.push({ user_id: G.uid('u'), username: un, password: pw, full_name: name,
+        S().users.push({ user_id: G.uid('u'), username: un, email: email, password: pw, full_name: name,
           role: role, status: status, date_created: Date.now() });
       } else {
         // keep at least one active Admin
@@ -777,7 +780,7 @@
         if (wasActiveAdmin && (role !== 'Owner' || status !== 'Active') && admins.length <= 1) {
           $('#uf-err').textContent = 'At least one active Admin must remain.'; return;
         }
-        u.full_name = name;
+        u.full_name = name; u.email = email;
         if (pw) {
           if (pw.length < 6) { $('#uf-err').textContent = 'Password must be at least 6 characters.'; return; }
           u.password = pw;

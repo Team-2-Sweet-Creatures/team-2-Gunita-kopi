@@ -65,7 +65,15 @@
       '<button type="button" class="pw-eye" id="lg-eye" aria-label="Show password">' + ICONS.eye + '</button></span></label>' +
       '<div class="field-err" id="lg-err" role="alert"></div>' +
       '<button class="btn btn-primary btn-block" id="lg-btn">Sign in</button>' +
+      (ROLE === 'Owner'
+        ? '<div class="login-links"><button type="button" class="link-btn" id="lg-forgot">Forgot password?</button>' +
+          (ownerSetupDone() ? '' : '<button type="button" class="link-btn" id="lg-create">Create account</button>') + '</div>'
+        : '') +
       '</div></div>';
+    if (ROLE === 'Owner') {
+      $('#lg-forgot').addEventListener('click', renderForgot);
+      if ($('#lg-create')) $('#lg-create').addEventListener('click', renderSignup);
+    }
     $('#lg-eye').addEventListener('click', function () {
       var p = $('#lg-pass');
       p.type = p.type === 'password' ? 'text' : 'password';
@@ -103,6 +111,150 @@
     $('#lg-pass').addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(); });
     $('#lg-user').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#lg-pass').focus(); });
     $('#lg-user').focus();
+  }
+
+  /* ================= owner: forgot password / create account ================= */
+  /* NOTE: no email server yet (data is localStorage). The recovery code is shown on screen as a demo;
+     replace sendRecoveryEmail() with the real email/Supabase call later. */
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function ownerSetupDone() {
+    return S().users.some(function (x) { return x.role === 'Owner' && x.email; });
+  }
+  function findOwnerByEmail(email) {
+    email = (email || '').trim().toLowerCase();
+    return S().users.filter(function (x) { return x.role === 'Owner' && x.email && x.email.toLowerCase() === email; })[0];
+  }
+  function authShell(title, sub, body, cls) {
+    document.body.classList.add('auth-mode');
+    $('#screen').innerHTML =
+      '<div class="login-wrap"><div class="login-card card' + (cls ? ' ' + cls : '') + '">' +
+      '<div class="login-brand"><span class="login-baybayin" lang="tl-Tglg" aria-hidden="true">ᜄᜓᜈᜒᜆ ᜃᜓᜉᜒ</span>' +
+      '<span class="brand-word">Gunita Kopi</span><span class="brand-sub">' + title + '</span></div>' +
+      (sub ? '<p class="muted auth-sub" style="font-size:.85rem;margin:0">' + sub + '</p>' : '') +
+      body +
+      '<div class="login-links"><button type="button" class="link-btn" id="au-back">&larr; Back to sign in</button></div>' +
+      '</div></div>';
+    $('#au-back').addEventListener('click', renderLogin);
+  }
+  function pwField(id, label) {
+    return '<label class="field">' + label + '<span class="pw-wrap"><input type="password" id="' + id + '" autocomplete="new-password">' +
+      '<button type="button" class="pw-eye" data-for="' + id + '" aria-label="Show password">' + ICONS.eye + '</button></span></label>';
+  }
+  function wireEyes() {
+    $$('.pw-eye[data-for]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var p = $('#' + b.getAttribute('data-for'));
+        p.type = p.type === 'password' ? 'text' : 'password';
+        b.innerHTML = p.type === 'password' ? ICONS.eye : ICONS.eyeOff;
+        b.setAttribute('aria-label', p.type === 'password' ? 'Show password' : 'Hide password');
+      });
+    });
+  }
+  function sendRecoveryEmail(user) {
+    var code = String(Math.floor(100000 + Math.random() * 900000));
+    S().recovery = { user_id: user.user_id, code: code, expires: Date.now() + 15 * 60000, tries: 0 };
+    G.save();
+    return code; /* a real backend would email this instead of returning it */
+  }
+
+  /* Step 1 — enter the Owner's email */
+  function renderForgot() {
+    authShell('Forgot password', 'Enter the email address associated with your Owner account.',
+      '<label class="field">Email address<input type="email" id="fp-email" autocomplete="email"></label>' +
+      '<div class="field-err" id="fp-err" role="alert"></div>' +
+      '<button class="btn btn-primary btn-block" id="fp-btn">Send recovery link</button>');
+    function submit() {
+      var email = $('#fp-email').value.trim();
+      if (!EMAIL_RE.test(email)) { $('#fp-err').textContent = 'Enter a valid email address.'; return; }
+      var u = findOwnerByEmail(email);
+      var demoCode = u && u.status === 'Active' ? sendRecoveryEmail(u) : null;
+      renderCheckEmail(email, demoCode);
+    }
+    $('#fp-btn').addEventListener('click', submit);
+    $('#fp-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    $('#fp-email').focus();
+  }
+
+  /* Step 2 — "check your email" + enter the code */
+  function renderCheckEmail(email, demoCode) {
+    authShell('Check your email',
+      'If <strong>' + esc(email) + '</strong> belongs to an Owner account, a recovery code has been sent. It expires in 15 minutes.',
+      (demoCode ? '<div class="demo-box"><strong>Demo mode</strong><span>No email service is connected yet. Your code: <span class="num">' + demoCode + '</span></span></div>' : '') +
+      '<label class="field">Recovery code<input type="text" id="ce-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>' +
+      '<div class="field-err" id="ce-err" role="alert"></div>' +
+      '<button class="btn btn-primary btn-block" id="ce-btn">Continue</button>');
+    function submit() {
+      var r = S().recovery, code = $('#ce-code').value.trim(), err = $('#ce-err');
+      if (!r || Date.now() > r.expires) { err.textContent = 'Code expired or not found. Go back and request a new one.'; return; }
+      if (r.tries >= 5) { err.textContent = 'Too many wrong attempts. Request a new code.'; return; }
+      if (code !== r.code) { r.tries++; G.save(); err.textContent = 'Incorrect code.'; return; }
+      renderNewPassword(r.user_id);
+    }
+    $('#ce-btn').addEventListener('click', submit);
+    $('#ce-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    $('#ce-code').focus();
+  }
+
+  /* Step 3 — create new password */
+  function renderNewPassword(userId) {
+    authShell('Create new password', '',
+      pwField('np-pass', 'New password (min 6 chars)') +
+      pwField('np-pass2', 'Confirm new password') +
+      '<div class="field-err" id="np-err" role="alert"></div>' +
+      '<button class="btn btn-primary btn-block" id="np-btn">Update password</button>');
+    wireEyes();
+    function submit() {
+      var pw = $('#np-pass').value, pw2 = $('#np-pass2').value, err = $('#np-err');
+      var u = S().users.filter(function (x) { return x.user_id === userId; })[0];
+      if (!u) { err.textContent = 'Account not found.'; return; }
+      if (pw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
+      if (pw !== pw2) { err.textContent = 'Passwords do not match.'; return; }
+      u.password = pw;
+      delete S().recovery;
+      G.save();
+      failCount = 0; lockUntil = 0;
+      renderLogin();
+      G.toast('Password successfully changed. Sign in with your username and new password.');
+    }
+    $('#np-btn').addEventListener('click', submit);
+    $('#np-pass2').addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    $('#np-pass').focus();
+  }
+
+  /* Create Owner account — initial setup only */
+  function renderSignup() {
+    if (ownerSetupDone()) { renderLogin(); return; }
+    authShell('Create Owner account', 'Set up your administrative account.',
+      '<div class="su-grid">' +
+      '<label class="field">Full name<input type="text" id="su-name" autocomplete="name"></label>' +
+      '<label class="field">Email address<input type="email" id="su-email" autocomplete="email"></label>' +
+      '<label class="field su-full">Username<input type="text" id="su-user" autocomplete="username"></label>' +
+      pwField('su-pass', 'Password (min 6 chars)') +
+      pwField('su-pass2', 'Confirm password') +
+      '</div>' +
+      '<div class="field-err" id="su-err" role="alert"></div>' +
+      '<button class="btn btn-primary btn-block" id="su-btn">Create account</button>' +
+      '<p class="muted su-note">Initial Owner registration only. Registration closes after setup.</p>',
+      'login-card-wide');
+    wireEyes();
+    function submit() {
+      var name = $('#su-name').value.trim(), email = $('#su-email').value.trim(), un = $('#su-user').value.trim();
+      var pw = $('#su-pass').value, pw2 = $('#su-pass2').value, err = $('#su-err');
+      if (!name) { err.textContent = 'Full name is required.'; return; }
+      if (!EMAIL_RE.test(email)) { err.textContent = 'Enter a valid email address.'; return; }
+      if (!un) { err.textContent = 'Username is required.'; return; }
+      if (S().users.some(function (x) { return x.username.toLowerCase() === un.toLowerCase(); })) { err.textContent = 'Username already taken.'; return; }
+      if (pw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
+      if (pw !== pw2) { err.textContent = 'Passwords do not match.'; return; }
+      S().users.push({ user_id: G.uid('u'), username: un, email: email, password: pw, full_name: name,
+        role: 'Owner', status: 'Active', date_created: Date.now() });
+      G.save();
+      renderLogin();
+      G.toast('Owner account created. You can sign in now.');
+    }
+    $('#su-btn').addEventListener('click', submit);
+    $('#su-pass2').addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    $('#su-name').focus();
   }
 
   /* ================= shell / routing ================= */
